@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SkillCraft — Calculator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0d0d14;
+    --surface:  #14141f;
+    --panel:    #1a1a2e;
+    --card:     #1e1e30;
+    --teal:     #00c9a7;
+    --violet:   #7c3aed;
+    --rose:     #e8405a;
+    --amber:    #f59e0b;
+    --text:     #e8e8f0;
+    --muted:    #7a7a9a;
+    --border:   rgba(255,255,255,.07);
+    --radius:   16px;
+    --ease:     cubic-bezier(.4,0,.2,1);
+    --font:     'Space Grotesk', sans-serif;
+    --font-d:   'Syne', sans-serif;
+  }
+
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1.5rem;
+    padding: 2rem 1rem;
+  }
+
+  /* orb bg */
+  body::before, body::after {
+    content: ''; position: fixed; border-radius: 50%; filter: blur(100px); opacity: .18; pointer-events: none; z-index: 0;
+  }
+  body::before { width: 500px; height: 500px; background: var(--violet); top: -150px; right: -100px; }
+  body::after  { width: 400px; height: 400px; background: var(--teal);   bottom: -100px; left: -80px; }
+
+  header {
+    text-align: center; position: relative; z-index: 1;
+  }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: .5rem;
+    font-size: .72rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--teal);
+    margin-bottom: .6rem;
+  }
+  .eyebrow::before { content:''; display:block; width:20px; height:2px; background:var(--teal); border-radius:2px; }
+  header h1 { font-family: var(--font-d); font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; }
+  header h1 span { color: var(--teal); }
+
+  /* ── CALCULATOR SHELL ── */
+  .calc {
+    width: min(380px, 100%);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04);
+    position: relative; z-index: 1;
+  }
+
+  /* ── DISPLAY ── */
+  .display {
+    background: var(--panel);
+    padding: 1.5rem 1.5rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    min-height: 120px;
+    display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end;
+    gap: .3rem;
+    position: relative;
+  }
+
+  .history-line {
+    font-size: .8rem; color: var(--muted); min-height: 1.2rem;
+    transition: opacity .2s; word-break: break-all; text-align: right;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .expression-line {
+    font-size: 1rem; color: var(--muted); min-height: 1.4rem;
+    word-break: break-all; text-align: right; max-width: 100%;
+  }
+
+  .result-line {
+    font-family: var(--font-d); font-size: 2.6rem; font-weight: 700;
+    color: var(--text); text-align: right; word-break: break-all;
+    transition: color .15s; line-height: 1.1; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .result-line.error { color: var(--rose); font-size: 1.4rem; }
+  .result-line.computing { color: var(--teal); }
+
+  /* keyboard hint */
+  .kbd-hint {
+    position: absolute; top: .75rem; left: 1rem;
+    font-size: .65rem; color: var(--muted); opacity: .6;
+    display: flex; align-items: center; gap: .3rem;
+  }
+  .kbd-hint kbd {
+    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1);
+    border-radius: 4px; padding: 1px 4px; font-family: var(--font); font-size: .6rem;
+  }
+
+  /* ── BUTTONS ── */
+  .btn-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    padding: 1px;
+  }
+
+  button {
+    font-family: var(--font); font-size: 1.05rem; font-weight: 500;
+    background: var(--card); color: var(--text);
+    border: none; cursor: pointer; padding: 1.1rem .5rem;
+    position: relative; overflow: hidden;
+    transition: background .15s var(--ease), color .15s var(--ease), transform .1s var(--ease);
+    user-select: none; -webkit-user-select: none;
+  }
+  button:active { transform: scale(.93); }
+
+  /* ripple */
+  button .ripple {
+    position: absolute; border-radius: 50%; background: rgba(255,255,255,.18);
+    transform: scale(0); animation: ripple-anim .5s linear;
+    pointer-events: none;
+  }
+  @keyframes ripple-anim { to { transform: scale(4); opacity: 0; } }
+
+  button:hover { background: #252538; }
+
+  /* operator keys */
+  button.op { color: var(--teal); font-weight: 600; }
+  button.op:hover { background: rgba(0,201,167,.12); }
+
+  /* action keys (AC, ±, %) */
+  button.action { color: var(--text); background: #1e1e30; font-weight: 600; }
+  button.action:hover { background: #28283e; }
+
+  /* equals */
+  button.equals {
+    background: var(--teal); color: #0d0d14; font-weight: 700; font-size: 1.2rem;
+  }
+  button.equals:hover { background: #00e0bc; }
+  button.equals:active { transform: scale(.9); }
+
+  /* clear */
+  button.clear { color: var(--rose); font-weight: 700; }
+  button.clear:hover { background: rgba(232,64,90,.12); }
+
+  /* span 2 cols */
+  button.span2 { grid-column: span 2; }
+
+  /* active (keyboard) highlight */
+  button.key-active { background: rgba(0,201,167,.18) !important; }
+
+  /* ── FOOTER ── */
+  footer { font-size: .72rem; color: var(--muted); text-align: center; position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Task 02 — Calculator Web App</div>
+  <h1>Skill<span>Craft</span> Calc</h1>
+</header>
+
+<div class="calc" role="application" aria-label="Calculator">
+  <div class="display">
+    <div class="kbd-hint"><kbd>⌨</kbd> keyboard supported</div>
+    <div class="history-line"    id="history"></div>
+    <div class="expression-line" id="expression"></div>
+    <div class="result-line"     id="result">0</div>
+  </div>
+
+  <div class="btn-grid" id="btnGrid">
+    <!-- Row 1 -->
+    <button class="clear  action" data-action="clear">AC</button>
+    <button class="action"        data-action="sign">±</button>
+    <button class="action"        data-action="percent">%</button>
+    <button class="op"            data-action="op" data-val="÷">÷</button>
+    <!-- Row 2 -->
+    <button data-action="num" data-val="7">7</button>
+    <button data-action="num" data-val="8">8</button>
+    <button data-action="num" data-val="9">9</button>
+    <button class="op" data-action="op" data-val="×">×</button>
+    <!-- Row 3 -->
+    <button data-action="num" data-val="4">4</button>
+    <button data-action="num" data-val="5">5</button>
+    <button data-action="num" data-val="6">6</button>
+    <button class="op" data-action="op" data-val="−">−</button>
+    <!-- Row 4 -->
+    <button data-action="num" data-val="1">1</button>
+    <button data-action="num" data-val="2">2</button>
+    <button data-action="num" data-val="3">3</button>
+    <button class="op" data-action="op" data-val="+">+</button>
+    <!-- Row 5 -->
+    <button data-action="num" data-val="0" class="span2">0</button>
+    <button data-action="decimal">.</button>
+    <button class="equals" data-action="equals">=</button>
+  </div>
+</div>
+
+<footer>Supports keyboard input · Esc to clear · Backspace to delete</footer>
+
+<script>
+/* ─── STATE ─── */
+const state = {
+  current:    '',   // number being typed
+  previous:   '',   // previous operand
+  operator:   null, // pending operator
+  justEvaled: false // did we just press =?
+};
+
+/* ─── DOM REFS ─── */
+const historyEl    = document.getElementById('history');
+const expressionEl = document.getElementById('expression');
+const resultEl     = document.getElementById('result');
+
+/* ─── RENDER ─── */
+function render() {
+  const display = state.current || (state.justEvaled ? resultEl.textContent : '0');
+  setResult(display);
+  if (state.operator && state.previous !== '') {
+    expressionEl.textContent = `${state.previous} ${state.operator}`;
+  } else {
+    expressionEl.textContent = '';
+  }
+}
+
+function setResult(val, cls = '') {
+  resultEl.textContent = val;
+  resultEl.className = 'result-line' + (cls ? ' ' + cls : '');
+  /* shrink font if long */
+  const len = String(val).length;
+  resultEl.style.fontSize = len > 14 ? '1.4rem' : len > 10 ? '1.9rem' : '2.6rem';
+}
+
+/* ─── ACTIONS ─── */
+function inputDigit(digit) {
+  if (state.justEvaled) {
+    state.current = digit;
+    state.previous = '';
+    state.operator = null;
+    state.justEvaled = false;
+  } else {
+    if (state.current.length >= 15) return;
+    state.current = state.current === '0' ? digit : state.current + digit;
+  }
+  render();
+}
+
+function inputDecimal() {
+  if (state.justEvaled) { state.current = '0.'; state.justEvaled = false; render(); return; }
+  if (state.current.includes('.')) return;
+  state.current = (state.current || '0') + '.';
+  render();
+}
+
+function inputOperator(op) {
+  if (state.current === '' && state.previous === '') return;
+
+  /* chain: eval pending first */
+  if (state.current !== '' && state.previous !== '' && state.operator) {
+    const res = compute(parseFloat(state.previous), parseFloat(state.current), state.operator);
+    if (res === null) return;
+    historyEl.textContent = `${state.previous} ${state.operator} ${state.current} =`;
+    state.previous = formatNum(res);
+    state.current  = '';
+  } else if (state.current !== '') {
+    state.previous = state.current;
+    state.current  = '';
+  }
+  state.operator   = op;
+  state.justEvaled = false;
+  render();
+}
+
+function evaluate() {
+  if (!state.operator || state.previous === '') return;
+  const b = state.current !== '' ? parseFloat(state.current) : parseFloat(state.previous);
+  const a = parseFloat(state.previous);
+  const res = compute(a, b, state.operator);
+  if (res === null) return;
+
+  historyEl.textContent = `${state.previous} ${state.operator} ${b} =`;
+  expressionEl.textContent = '';
+  state.current    = '';
+  state.previous   = '';
+  state.operator   = null;
+  state.justEvaled = true;
+  setResult(formatNum(res), 'computing');
+  setTimeout(() => resultEl.classList.remove('computing'), 300);
+}
+
+function compute(a, b, op) {
+  let result;
+  if (op === '+')  result = a + b;
+  else if (op === '−') result = a - b;
+  else if (op === '×') result = a * b;
+  else if (op === '÷') {
+    if (b === 0) { showError("Can't divide by zero"); return null; }
+    result = a / b;
+  }
+  /* floating point fix */
+  return parseFloat(result.toPrecision(12));
+}
+
+function toggleSign() {
+  if (state.current) state.current = String(parseFloat(state.current) * -1);
+  else if (state.justEvaled) {
+    const v = parseFloat(resultEl.textContent) * -1;
+    setResult(formatNum(v)); return;
+  }
+  render();
+}
+
+function percent() {
+  if (state.current) state.current = String(parseFloat(state.current) / 100);
+  else if (state.justEvaled) {
+    const v = parseFloat(resultEl.textContent) / 100;
+    setResult(formatNum(v)); return;
+  }
+  render();
+}
+
+function clearAll() {
+  state.current = ''; state.previous = ''; state.operator = null; state.justEvaled = false;
+  historyEl.textContent = ''; expressionEl.textContent = '';
+  setResult('0');
+}
+
+function backspace() {
+  if (state.justEvaled) { clearAll(); return; }
+  state.current = state.current.slice(0, -1);
+  render();
+}
+
+function showError(msg) {
+  setResult(msg, 'error');
+  state.current = ''; state.previous = ''; state.operator = null; state.justEvaled = false;
+}
+
+function formatNum(n) {
+  if (Number.isNaN(n) || !isFinite(n)) { showError('Error'); return ''; }
+  /* avoid scientific notation for reasonable numbers */
+  const s = parseFloat(n.toPrecision(10));
+  return String(s);
+}
+
+/* ─── BUTTON CLICK EVENTS ─── */
+document.getElementById('btnGrid').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  ripple(btn, e);
+  const { action, val } = btn.dataset;
+  if (action === 'num')     inputDigit(val);
+  if (action === 'op')      inputOperator(val);
+  if (action === 'decimal') inputDecimal();
+  if (action === 'equals')  evaluate();
+  if (action === 'clear')   clearAll();
+  if (action === 'sign')    toggleSign();
+  if (action === 'percent') percent();
+  /* update AC / C label */
+  btn.closest('.btn-grid').querySelector('[data-action="clear"]').textContent =
+    (state.current || state.previous) ? 'C' : 'AC';
+});
+
+/* ─── RIPPLE ─── */
+function ripple(btn, e) {
+  const r   = btn.getBoundingClientRect();
+  const sz  = Math.max(r.width, r.height);
+  const x   = e.clientX - r.left  - sz / 2;
+  const y   = e.clientY - r.top   - sz / 2;
+  const el  = document.createElement('span');
+  el.className = 'ripple';
+  el.style.cssText = `width:${sz}px;height:${sz}px;left:${x}px;top:${y}px`;
+  btn.appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
+}
+
+/* ─── KEYBOARD INPUT ─── */
+const keyMap = {
+  '0':'0','1':'1','2':'2','3':'3','4':'4','5':'5','6':'6','7':'7','8':'8','9':'9',
+  '.':'decimal',',':'decimal',
+  '+':'+','-':'−','*':'×','/':'÷',
+  'Enter':'=','=':'=',
+  'Backspace':'backspace','Escape':'clear','%':'percent'
+};
+
+const btnSelector = (q) => document.querySelector(`[data-val="${q}"], [data-action="${q}"]`);
+
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const mapped = keyMap[e.key];
+  if (!mapped) return;
+  e.preventDefault();
+
+  /* flash button */
+  const btn = btnSelector(mapped) || btnSelector(e.key);
+  if (btn) { btn.classList.add('key-active'); setTimeout(() => btn.classList.remove('key-active'), 130); }
+
+  if ('0123456789'.includes(mapped)) inputDigit(mapped);
+  else if (mapped === 'decimal')  inputDecimal();
+  else if (['+','−','×','÷'].includes(mapped)) inputOperator(mapped);
+  else if (mapped === '=')        evaluate();
+  else if (mapped === 'clear')    clearAll();
+  else if (mapped === 'backspace') backspace();
+  else if (mapped === 'percent')  percent();
+});
+</script>
+</body>
+</html>
